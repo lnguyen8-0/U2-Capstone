@@ -17,7 +17,7 @@ def validate_qualitative(answer: str, chunks: list[dict]) -> dict:
         "warning": "Response may not be grounded in source documents" if (not grounded and not refused) else None
     }
 
-def validate_quantitative(answer: str, sql: str, validation_status: str) -> dict:
+def validate_quantitative(sql: str, validation_status: str) -> dict:
     return {
         "sql_validated": validation_status == "PASSED",
         "sql_blocked": validation_status == "FAILED",
