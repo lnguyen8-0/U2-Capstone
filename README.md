@@ -33,8 +33,29 @@ A multi-agent system that answers questions about Northstar Solutions' policies 
 - Prices: $0.00075 per 1,000 tokens for both input and output (flat rate, Gemini 3.5 Flash-Lite).
 - Average cost per qualitative query: about $0.0025, or about $2.50 per 1,000 queries.
 - Average cost per quantitative query: about $0.0002–$0.0006, or about $0.20–$0.60 per 1,000 queries.
-- Qualitative queries cost roughly 5–10× more than quantitative ones because the 5 retrieved chunks add approximately 2,500–3,000 input tokens per call.
+- Qualitative queries cost roughly 5–10× more than quantitative ones because the retrieved chunks add the bulk of input tokens per call.
 - The most expensive query type is "both" routing, which runs the full RAG pipeline and the SQL pipeline in the same call.
+
+### Tokenomics log analysis (`tokenomics_log.jsonl`)
+
+Analysis over 51 logged calls (26 classifier, 12 qualitative, 13 quantitative):
+
+| Agent | Calls | Avg input tokens | Avg output tokens | Total cost |
+|---|---|---|---|---|
+| manager-classifier | 26 | 86 | 1 | $0.0017 |
+| qualitative | 12 | 3,060 | 143 | $0.0288 |
+| quantitative | 13 | 239 | 233 | $0.0046 |
+
+The qualitative agent consumed 88 % of total token cost despite handling fewer than a quarter of calls. Profiling the prompt showed that the five retrieved chunks contributed approximately 2,700 of the 3,060 average input tokens — about 88 % of the input budget — while the answer quality was typically determined by the top one or two matches.
+
+**Concrete change made:** Reduced `top_k` from 5 to 3 in `qualitative.py:retrieve()`.
+
+Back-of-envelope impact at the observed average of 540 tokens per chunk:
+- Before: 3,060 input tokens/call → $0.00230/call
+- After: ~1,980 input tokens/call → ~$0.00149/call (estimated ~35 % reduction)
+- Projected saving at 1,000 qualitative queries/day: ~$0.81/day, ~$296/year
+
+Output quality was not degraded: every test query that previously returned a grounded, cited answer continued to do so after the change, because the top-3 chunks consistently contained the relevant policy section. The two dropped chunks were lower-similarity matches that did not appear in any citation.
 
 ## Limitations
 - `validate_qualitative` checks that a source was cited, not that the answer is correct or complete (see Trust-but-Verify).

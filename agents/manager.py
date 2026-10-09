@@ -45,7 +45,7 @@ Reply with one word only: qualitative, quantitative, or both."""
 
     return route if route in ["qualitative", "quantitative", "both"] else "qualitative"
 
-def run(query: str):
+def run(query: str, history: list[dict] | None = None) -> str:
     print(f"\nQuery: {query}")
     route = classify(query)
     print(f"Route: {route}")
@@ -54,11 +54,19 @@ def run(query: str):
     quant_result = None
 
     if route in ["qualitative", "both"]:
-        qual_result = qualitative.run(query)
+        qual_result = qualitative.run(query, history)
         validation = validate_qualitative(qual_result["answer"], qual_result["chunks"])
         log(query, "qualitative", qual_result["input_tokens"], qual_result["output_tokens"])
         if validation["flag"]:
             print(f"\n⚠️  VALIDATION WARNING: {validation['warning']}")
+
+        review = qualitative.review(qual_result["answer"], qual_result["chunks"])
+        log(query, "qualitative-reviewer", review["input_tokens"], review["output_tokens"])
+        if review["supported"]:
+            print(f"\n✓  LLM REVIEWER: {review['verdict']} — {review['reason']}")
+        else:
+            print(f"\n⚠️  LLM REVIEWER: {review['verdict']} — {review['reason']}")
+
         print(f"\n[Qualitative]\n{qual_result['answer']}")
 
     if route in ["quantitative", "both"]:
@@ -72,3 +80,10 @@ def run(query: str):
             print(f"\n⚠️  VALIDATION WARNING: {validation['warning']}")
         print(f"\n[Quantitative]\n{quant_result['answer']}")
         print(f"SQL used: {quant_result['sql']}")
+
+    parts = []
+    if qual_result:
+        parts.append(qual_result["answer"])
+    if quant_result:
+        parts.append(quant_result["answer"])
+    return "\n".join(parts)
